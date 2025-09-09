@@ -920,115 +920,13 @@ def dislike_post_handler(post_id: int = Path(..., gt=0), user=Depends(get_curren
 
 ```
 
-В каталоге `src/validators` создайте файл `postValidators.js` и поместите туда код:
-
-```python
-import { z } from "zod";
-
-export const createPostValidator = z.object({
-  text: z.string().min(1).max(280),
-  reply_to_id: z
-    .number()
-    .optional()
-    .nullable()
-    .refine(val => val === undefined || val > 0, {
-      message: "ReplyToID must be greater than 0",
-    }),
-});
-
-export const filterPostValidator = z.object({
-  search: z.string().optional(),
-  owner_id: z.string().regex(/^\d+$/).optional(),
-  user_id: z.string().regex(/^\d+$/).optional(),
-  reply_to_id: z.string().regex(/^\d+$/).optional(),
-  limit: z.string().regex(/^\d+$/).optional(),
-  offset: z.string().regex(/^\d+$/).optional(),
-});
-```
-
-Далее добавим маршруты. В каталоге `src/routes` создайте файл `postRoutes.js` и поместите туда код:
-
-```python
-import express from "express";
-import { PostController } from "../controllers/postController.js";
-import { validate } from "../middleware/validate.js";
-import { requestAuth, requestAuthSameId } from "../middleware/auth.js";
-import { createPostValidator } from "../validators/postValidators.js";
-
-const router = express.Router();
-
-router.get("/", requestAuth(process.env.ACCESS_TOKEN_SECRET), PostController.getAllPosts);
-
-router.post(
-  "/",
-  requestAuth(process.env.ACCESS_TOKEN_SECRET),
-  validate(createPostValidator),
-  PostController.createPost
-);
-
-router.delete("/:id", requestAuthSameId(process.env.ACCESS_TOKEN_SECRET), PostController.deletePost);
-
-router.post("/:id/view", requestAuth(process.env.ACCESS_TOKEN_SECRET), PostController.viewPost);
-
-router.post("/:id/like", requestAuth(process.env.ACCESS_TOKEN_SECRET), PostController.likePost);
-
-router.post("/:id/dislike", requestAuth(process.env.ACCESS_TOKEN_SECRET), PostController.dislikePost);
-
-export default router;
-```
-
-Далее необходимо обновить `app.js`, добавив две строки (выделены зеленым цветом):
-
-```python
-import dotenv from "dotenv";
-import express from "express";
-import { pool } from "./config/db.js";
-import authRoutes from "./routes/authRoutes.js";
-import postRoutes from "./routes/postRoutes.js"; // [!code ++]
-import userRoutes from "./routes/userRoutes.js";
-
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(express.json());
-
-app.use("/api/auth", authRoutes);
-app.use("/api/posts", postRoutes); // [!code ++]
-app.use("/api/users", userRoutes);
-
-app.get("/api/health-check", async (req, res) => {
-  try {
-    await pool.query("SELECT 1");
-    res.status(200).send("OK");
-  } catch (err) {
-    res.status(500).send("DB connection failed");
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-```
-
 После этого нужно запустить сервер. Если все сделано правильно, он запустится без ошибок:
 
 ```bash
-npm run dev
-
-> gophertalk-backend-express@0.1.0 dev
-> nodemon src/app.js
-
-[nodemon] 3.1.9
-[nodemon] to restart at any time, enter `rs`
-[nodemon] watching path(s): *.*
-[nodemon] watching extensions: js,mjs,cjs,json
-[nodemon] starting `node src/app.js`
-Server is running on port 3000
+python3 app.py
 ```
 
-Самостоятельно проверьте эндпоинты из папки `users` в Postman:
+Самостоятельно проверьте эндпоинты из папки `posts` в Postman:
 
 - `get all` - получить все посты
 - `delete` - удалить пост (можно удалить только свой пост; проверьте, что произойдет с записью поста в базе данных)
@@ -1039,163 +937,214 @@ Server is running on port 3000
 
 ## Тестирование контроллера постов
 
-В каталоге `__tests__/controllers` создайте файл `postController.test.js` и поместите в него следующий код:
+В каталоге `tests/controllers` создайте файл `test_post_controller.py` и поместите в него следующий код:
 
-::: details Unit тесты postController
+::: details Unit тесты `post_controller`
 
 ```python
-import { expect, jest } from "@jest/globals";
-import dotenv from "dotenv";
-import express from "express";
-import jwt from "jsonwebtoken";
-import request from "supertest";
-import { PostController } from "../../src/controllers/postController.js";
-import { requestAuth } from "../../src/middleware/auth.js";
-import { validate } from "../../src/middleware/validate.js";
-import { PostService } from "../../src/services/postService.js";
-import { createPostValidator } from "../../src/validators/postValidators.js";
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+from app import app
 
-dotenv.config();
+client = TestClient(app)
 
-const app = express();
-app.use(express.json());
 
-app.use((req, res, next) => {
-  const token = jwt.sign({ sub: "1" }, process.env.ACCESS_TOKEN_SECRET);
-  req.headers.authorization = `Bearer ${token}`;
-  requestAuth(process.env.ACCESS_TOKEN_SECRET)(req, res, next);
-});
+@pytest.fixture
+def mock_token_header():
+    return {"Authorization": "Bearer mockToken"}
 
-app.get("/api/posts", PostController.getAllPosts);
-app.post("/api/posts", validate(createPostValidator), PostController.createPost);
-app.delete("/api/posts/:id", PostController.deletePost);
-app.post("/api/posts/:id/view", PostController.viewPost);
-app.post("/api/posts/:id/like", PostController.likePost);
-app.delete("/api/posts/:id/like", PostController.dislikePost);
 
-describe("PostController", () => {
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+@pytest.fixture
+def mock_user():
+    user = MagicMock()
+    user.sub = 1
+    return user
 
-  describe("GET /api/posts", () => {
-    it("should fetch posts successfully", async () => {
-      const posts = [{ id: 1, text: "Test post" }];
-      jest.spyOn(PostService, "getAllPosts").mockResolvedValueOnce(posts);
 
-      const res = await request(app).get("/api/posts?limit=10&offset=0");
+@pytest.fixture
+def mock_post_dto():
+    return {
+        "id": 1,
+        "user_id": 1,
+        "content": "Test post content",
+        "reply_to_id": None,
+        "created_at": "2024-01-01T10:00:00",
+        "likes_count": 0,
+        "views_count": 0
+    }
 
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual(posts);
-      expect(PostService.getAllPosts).toHaveBeenCalled();
-    });
 
-    it("should handle service error", async () => {
-      jest.spyOn(PostService, "getAllPosts").mockRejectedValueOnce(new Error("Service error"));
+@pytest.fixture
+def mock_post_create_dto():
+    return {
+        "content": "Test post content",
+        "reply_to_id": None
+    }
 
-      const res = await request(app).get("/api/posts?limit=10&offset=0");
 
-      expect(res.status).toBe(400);
-      expect(PostService.getAllPosts).toHaveBeenCalled();
-    });
-  });
+@pytest.fixture
+def mock_posts_list(mock_post_dto):
+    return [mock_post_dto]
 
-  describe("POST /api/posts", () => {
-    it("should create a post successfully", async () => {
-      const post = { id: 1, text: "New post" };
-      jest.spyOn(PostService, "createPost").mockResolvedValueOnce(post);
 
-      const res = await request(app).post("/api/posts").send({ text: "New post" });
+def test_get_all_posts_success(mock_token_header, mock_posts_list, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.get_all_posts", return_value=mock_posts_list):
+        response = client.get("/api/posts?limit=10&offset=0", headers=mock_token_header)
 
-      expect(res.status).toBe(201);
-      expect(res.body).toEqual(post);
-      expect(PostService.createPost).toHaveBeenCalled();
-    });
+    assert response.status_code == 200
+    assert response.json() == mock_posts_list
 
-    it("should handle validation error", async () => {
-      const res = await request(app).post("/api/posts").send({});
 
-      expect(res.status).toBe(422);
-    });
+def test_get_all_posts_with_filters_success(mock_token_header, mock_posts_list, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.get_all_posts", return_value=mock_posts_list):
+        response = client.get(
+            "/api/posts?limit=5&offset=10&reply_to_id=2&owner_id=3&search=test",
+            headers=mock_token_header
+        )
 
-    it("should handle service error", async () => {
-      jest.spyOn(PostService, "createPost").mockRejectedValueOnce(new Error("Service error"));
+    assert response.status_code == 200
+    assert response.json() == mock_posts_list
 
-      const res = await request(app).post("/api/posts").send({ text: "New post" });
 
-      expect(res.status).toBe(400);
-      expect(PostService.createPost).toHaveBeenCalled();
-    });
-  });
+def test_get_all_posts_failure(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.get_all_posts", side_effect=Exception("Service error")):
+        response = client.get("/api/posts", headers=mock_token_header)
 
-  describe("DELETE /api/posts/:id", () => {
-    it("should delete post successfully", async () => {
-      jest.spyOn(PostService, "deletePost").mockResolvedValueOnce();
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Service error"}
 
-      const res = await request(app).delete("/api/posts/1");
 
-      expect(res.status).toBe(204);
-      expect(PostService.deletePost).toHaveBeenCalled();
-    });
+def test_create_post_success(mock_token_header, mock_post_create_dto, mock_post_dto, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.create_post", return_value=mock_post_dto):
+        response = client.post("/api/posts", headers=mock_token_header, json=mock_post_create_dto)
 
-    it("should handle invalid id", async () => {
-      const res = await request(app).delete("/api/posts/abc");
+    assert response.status_code == 201
+    assert response.json() == mock_post_dto
 
-      expect(res.status).toBe(404);
-    });
-  });
 
-  describe("POST /api/posts/:id/view", () => {
-    it("should view post successfully", async () => {
-      jest.spyOn(PostService, "viewPost").mockResolvedValueOnce();
+def test_create_post_failure(mock_token_header, mock_post_create_dto, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.create_post", side_effect=Exception("Service error")):
+        response = client.post("/api/posts", headers=mock_token_header, json=mock_post_create_dto)
 
-      const res = await request(app).post("/api/posts/1/view");
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Service error"}
 
-      expect(res.status).toBe(201);
-      expect(PostService.viewPost).toHaveBeenCalled();
-    });
 
-    it("should handle invalid id", async () => {
-      const res = await request(app).post("/api/posts/abc/view");
+def test_create_post_validation_failure(mock_token_header, mock_user):
+    invalid_dto = {"content": ""}  # пустой контент
+    with patch("dependencies.auth.get_current_user", return_value=mock_user):
+        response = client.post("/api/posts", headers=mock_token_header, json=invalid_dto)
 
-      expect(res.status).toBe(404);
-    });
-  });
+    assert response.status_code == 422
 
-  describe("POST /api/posts/:id/like", () => {
-    it("should like post successfully", async () => {
-      jest.spyOn(PostService, "likePost").mockResolvedValueOnce();
 
-      const res = await request(app).post("/api/posts/1/like");
+def test_delete_post_success(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.delete_post", return_value=None):
+        response = client.delete("/api/posts/1", headers=mock_token_header)
 
-      expect(res.status).toBe(201);
-      expect(PostService.likePost).toHaveBeenCalled();
-    });
+    assert response.status_code == 204
 
-    it("should handle invalid id", async () => {
-      const res = await request(app).post("/api/posts/abc/like");
 
-      expect(res.status).toBe(404);
-    });
-  });
+def test_delete_post_invalid_id(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user):
+        response = client.delete("/api/posts/abc", headers=mock_token_header)
 
-  describe("DELETE /api/posts/:id/like", () => {
-    it("should dislike post successfully", async () => {
-      jest.spyOn(PostService, "dislikePost").mockResolvedValueOnce();
+    assert response.status_code == 422
 
-      const res = await request(app).delete("/api/posts/1/like");
 
-      expect(res.status).toBe(204);
-      expect(PostService.dislikePost).toHaveBeenCalled();
-    });
+def test_delete_post_not_found(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.delete_post", side_effect=Exception("Post not found")):
+        response = client.delete("/api/posts/999", headers=mock_token_header)
 
-    it("should handle invalid id", async () => {
-      const res = await request(app).delete("/api/posts/abc/like");
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Post not found"}
 
-      expect(res.status).toBe(404);
-    });
-  });
-});
+
+def test_delete_post_zero_id(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user):
+        response = client.delete("/api/posts/0", headers=mock_token_header)
+
+    assert response.status_code == 422
+
+
+def test_view_post_success(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.view_post", return_value=None):
+        response = client.post("/api/posts/1/view", headers=mock_token_header)
+
+    assert response.status_code == 201
+
+
+def test_view_post_invalid_id(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user):
+        response = client.post("/api/posts/abc/view", headers=mock_token_header)
+
+    assert response.status_code == 422
+
+
+def test_view_post_not_found(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.view_post", side_effect=Exception("Post not found")):
+        response = client.post("/api/posts/999/view", headers=mock_token_header)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Post not found"}
+
+
+def test_like_post_success(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.like_post", return_value=None):
+        response = client.post("/api/posts/1/like", headers=mock_token_header)
+
+    assert response.status_code == 201
+
+
+def test_like_post_invalid_id(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user):
+        response = client.post("/api/posts/abc/like", headers=mock_token_header)
+
+    assert response.status_code == 422
+
+
+def test_like_post_not_found(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.like_post", side_effect=Exception("Post not found")):
+        response = client.post("/api/posts/999/like", headers=mock_token_header)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Post not found"}
+
+
+def test_dislike_post_success(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.dislike_post", return_value=None):
+        response = client.delete("/api/posts/1/like", headers=mock_token_header)
+
+    assert response.status_code == 204
+
+
+def test_dislike_post_invalid_id(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user):
+        response = client.delete("/api/posts/abc/like", headers=mock_token_header)
+
+    assert response.status_code == 422
+
+
+def test_dislike_post_not_found(mock_token_header, mock_user):
+    with patch("dependencies.auth.get_current_user", return_value=mock_user), \
+         patch("controllers.post_controller.dislike_post", side_effect=Exception("Post not found")):
+        response = client.delete("/api/posts/999/like", headers=mock_token_header)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Post not found"}
 ```
 
 :::
