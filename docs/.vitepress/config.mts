@@ -1,5 +1,6 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
+import mathjax3 from "markdown-it-mathjax3";
 
 // https://vitepress.dev/reference/site-config
 export default withMermaid(
@@ -41,7 +42,16 @@ export default withMermaid(
                 },
                 {
                   text: "Реляционная модель данных",
-                  link: "/databases/essentials/relational-model",
+                  items: [
+                    {
+                      text: "Реляционная модель данных",
+                      link: "/databases/essentials/relational-model/relational-model",
+                    },
+                    {
+                      text: "Основы проектирования баз данных",
+                      link: "/databases/essentials/relational-model/erd-essentials",
+                    },
+                  ],
                 },
                 {
                   text: "Разработка информационно-логической модели БД",
@@ -255,6 +265,11 @@ export default withMermaid(
     vite: {
       optimizeDeps: {
         exclude: ["@electric-sql/pglite"],
+      },
+    },
+    markdown: {
+      config: (md) => {
+        md.use(mathjax3);
       },
     },
   }),
