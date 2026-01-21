@@ -15,7 +15,7 @@ export default withMermaid(
         { text: "Главная", link: "/" },
         {
           text: "Базы данных",
-          link: "/databases/essentials/introduction",
+          link: "/databases/essentials/introduction/introduction",
         },
       ],
 
@@ -28,7 +28,16 @@ export default withMermaid(
               items: [
                 {
                   text: "Введение в базы данных",
-                  link: "/databases/essentials/introduction",
+                  items: [
+                    {
+                      text: "Введение в базы данных",
+                      link: "/databases/essentials/introduction/introduction",
+                    },
+                    {
+                      text: "Основные принципы функционирования СУБД",
+                      link: "/databases/essentials/introduction/dbms-principles",
+                    },
+                  ],
                 },
                 {
                   text: "Реляционная модель данных",
@@ -248,5 +257,5 @@ export default withMermaid(
         exclude: ["@electric-sql/pglite"],
       },
     },
-  })
+  }),
 );
