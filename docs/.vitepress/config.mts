@@ -88,7 +88,20 @@ export default withMermaid(
                 {
                   collapsed: true,
                   text: "Выборка данных",
-                  link: "/databases/sql/single-table-select",
+                  items: [
+                    {
+                      text: "Отбор строк. Поиск по шаблону",
+                      link: "/databases/sql/single-table-select/selections",
+                    },
+                    {
+                      text: "Сортировка и группировка данных",
+                      link: "/databases/sql/single-table-select/order-and-group",
+                    },
+                    {
+                      text: "Разработка запросов на выборку данных",
+                      link: "/databases/sql/single-table-select/task",
+                    },
+                  ],
                 },
                 {
                   collapsed: true,
