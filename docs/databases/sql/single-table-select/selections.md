@@ -408,7 +408,7 @@ FROM recruits;
 ```sql
 SELECT last_name,
 height_cm,
-(height_cm::numeric / 100) AS height_m
+(height_cm::real / 100) AS height_m
 FROM recruits;
 ```
 
@@ -675,10 +675,6 @@ SELECT * FROM recruits WHERE last_name LIKE '%\_%';
         photo: alexey
     }
 ]"/>
-
-### Оператор `SIMILAR TO`
-
-Это гибрид. Он похож на `LIKE` (использует `%` и `_`), но понимает некоторые команды из мира регулярных выражений:
 
 ### Оператор `SIMILAR TO`
 
