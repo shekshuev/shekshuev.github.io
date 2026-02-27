@@ -125,7 +125,20 @@ export default withMermaid(
                 {
                   collapsed: true,
                   text: "Запросы с функциями",
-                  link: "/databases/sql/functions",
+                  items: [
+                    {
+                      text: "Встроенные функции СУБД PostgreSQL",
+                      link: "/databases/sql/functions/internal",
+                    },
+                    {
+                      text: "Оконные функции",
+                      link: "/databases/sql/functions/window",
+                    },
+                    {
+                      text: "Разработка запросов с функциями",
+                      link: "/databases/sql/functions/task",
+                    },
+                  ],
                 },
 
                 {
