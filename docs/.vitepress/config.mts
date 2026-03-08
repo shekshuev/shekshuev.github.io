@@ -144,7 +144,16 @@ export default withMermaid(
                 {
                   collapsed: true,
                   text: "Запросы с подзапросами",
-                  link: "/databases/sql/subqueries",
+                  items: [
+                    {
+                      text: "Основы применения подзапросов",
+                      link: "/databases/sql/subqueries/essentials",
+                    },
+                    {
+                      text: "Разработка запросов с подзапросами",
+                      link: "/databases/sql/subqueries/task",
+                    },
+                  ],
                 },
                 {
                   collapsed: true,
