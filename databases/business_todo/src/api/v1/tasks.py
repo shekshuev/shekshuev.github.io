@@ -41,8 +41,6 @@ def create_task(
         request: dict,
         current_user: dict = Depends(get_current_user)
 ):
-    if current_user["role"] != "customer" or current_user["role"] != "admin":
-        raise ValidationError("Only customers can create tasks")
     try:
         return TaskService.create_task(
             task_text=request.get("task_text"),
